@@ -27,7 +27,7 @@ import secrets
 import threading
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -99,6 +99,7 @@ class StatusJob:
 class PeriodoRequest(BaseModel):
     data_inicio: date
     data_fim: date
+    usuarios: Optional[List[str]] = None  # se nao informar, usa a lista padrao do servidor
 
     @field_validator("data_fim")
     @classmethod
@@ -107,6 +108,15 @@ class PeriodoRequest(BaseModel):
         if data_inicio and data_fim < data_inicio:
             raise ValueError("data_fim nao pode ser anterior a data_inicio")
         return data_fim
+
+    @field_validator("usuarios")
+    @classmethod
+    def valida_usuarios(cls, usuarios):
+        if usuarios is not None:
+            usuarios = [u.strip() for u in usuarios if u and u.strip()]
+            if not usuarios:
+                raise ValueError("a lista de usuarios, se enviada, nao pode ficar vazia")
+        return usuarios
 
 
 class JobCriadoResponse(BaseModel):
@@ -144,7 +154,7 @@ app.add_middleware(
 )
 
 
-def _executar_job(job_id: str, data_inicio: str, data_fim: str):
+def _executar_job(job_id: str, data_inicio: str, data_fim: str, usuarios: Optional[List[str]]):
     with JOBS_LOCK:
         JOBS[job_id]["status"] = StatusJob.PROCESSANDO
 
@@ -162,7 +172,8 @@ def _executar_job(job_id: str, data_inicio: str, data_fim: str):
             data_inicio,
             data_fim,
             str(arquivo_saida),
-            log_fn,
+            usuarios=usuarios,
+            log_fn=log_fn,
         )
         with JOBS_LOCK:
             JOBS[job_id].update(
@@ -197,7 +208,7 @@ def solicitar_relatorio(periodo: PeriodoRequest):
 
     thread = threading.Thread(
         target=_executar_job,
-        args=(job_id, periodo.data_inicio.isoformat(), periodo.data_fim.isoformat()),
+        args=(job_id, periodo.data_inicio.isoformat(), periodo.data_fim.isoformat(), periodo.usuarios),
         daemon=True,
     )
     thread.start()

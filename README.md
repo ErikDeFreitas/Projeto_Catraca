@@ -25,9 +25,15 @@ X-API-Key: <chave-combinada-com-voces>
 
 {
   "data_inicio": "2026-07-01",
-  "data_fim": "2026-07-20"
+  "data_fim": "2026-07-20",
+  "usuarios": ["Aline", "Dario", "Gabriel Correa"]
 }
 ```
+
+O campo `usuarios` é **opcional** — se não for enviado, a API usa a lista
+padrão configurada no servidor (`USUARIOS_PADRAO` em `catraca_core.py`).
+Enviando essa lista, o site controla dinamicamente quem entra no filtro,
+sem precisar mexer no código a cada mudança de período/pessoas.
 
 Resposta (imediata):
 ```json
@@ -96,14 +102,18 @@ download pelo navegador.
 const API_KEY = process.env.CATRACA_API_KEY; // nunca no frontend
 const BASE_URL = "https://relatorios.seudominio.com.br"; // dominio do Cloudflare Tunnel
 
-async function gerarRelatorio(dataInicio, dataFim) {
+async function gerarRelatorio(dataInicio, dataFim, usuarios) {
   const { job_id } = await fetch(`${BASE_URL}/relatorio`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": API_KEY,
     },
-    body: JSON.stringify({ data_inicio: dataInicio, data_fim: dataFim }),
+    body: JSON.stringify({
+      data_inicio: dataInicio,
+      data_fim: dataFim,
+      usuarios: usuarios, // opcional - array de nomes, ex: ["Aline", "Dario"]
+    }),
   }).then(r => r.json());
 
   // polling

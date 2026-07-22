@@ -14,10 +14,11 @@ from requests.adapters import HTTPAdapter, Retry
 
 
 # ======================================
-# LISTA DE USUARIOS (edite aqui se precisar)
+# LISTA DE USUARIOS PADRAO
+# (usada somente se a API/chamador nao informar uma lista de nomes)
 # ======================================
 
-USUARIOS = [
+USUARIOS_PADRAO = [
     "Agdo",
     "Aline",
     "Andreza",
@@ -27,16 +28,12 @@ USUARIOS = [
     "Erivelto",
     "Gabriel Correa",
     "Givaldo",
+    "Joao",
     "Marcos Oliveira",
     "Richard",
     "Robert",
     "Tiago Torre",
     "Wellington Souza",
-    "Gustavo",
-    "Joseildo",
-    "Matheus Hiroshi",
-    "Braz"
-
 ]
 
 
@@ -131,11 +128,13 @@ def consulta_acessos(http, ip, sessao, inicio_ts, fim_ts, log_fn):
     return list(reader)
 
 
-def gerar_relatorio(ip, usuario, senha, data_inicio, data_fim, arquivo_saida, log_fn=print):
+def gerar_relatorio(ip, usuario, senha, data_inicio, data_fim, arquivo_saida, usuarios=None, log_fn=print):
     """
     Gera o relatorio de acessos no periodo informado e salva em `arquivo_saida`.
 
     data_inicio / data_fim: strings no formato "YYYY-MM-DD".
+    usuarios: lista de nomes a filtrar. Se nao for informado (None), usa
+              USUARIOS_PADRAO.
 
     Retorna um dicionario com o resumo do processamento:
         {
@@ -145,6 +144,9 @@ def gerar_relatorio(ip, usuario, senha, data_inicio, data_fim, arquivo_saida, lo
             "arquivo": arquivo_saida,
         }
     """
+    if not usuarios:
+        usuarios = USUARIOS_PADRAO
+
     inicio_ts = int(datetime.strptime(data_inicio, "%Y-%m-%d").timestamp())
     fim_ts = int(
         (
@@ -157,8 +159,8 @@ def gerar_relatorio(ip, usuario, senha, data_inicio, data_fim, arquivo_saida, lo
     sessao = login(http, ip, usuario, senha, log_fn)
     todas_linhas = consulta_acessos(http, ip, sessao, inicio_ts, fim_ts, log_fn)
 
-    usuarios_lower = {u.lower(): u for u in USUARIOS}
-    contagem = {u: 0 for u in USUARIOS}
+    usuarios_lower = {u.lower(): u for u in usuarios}
+    contagem = {u: 0 for u in usuarios}
     linhas_filtradas = []
 
     for linha in todas_linhas:
