@@ -1,0 +1,22 @@
+services:
+  api:
+    build: .
+    container_name: catraca-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./relatorios:/app/relatorios
+    # Nao precisa publicar a porta pra internet (ports/expose) porque quem
+    # fala com o mundo externo e o cloudflared, aqui embaixo. Deixamos
+    # acessivel so dentro da rede docker interna (api:8000).
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: catraca-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - api

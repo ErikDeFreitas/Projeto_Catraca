@@ -23,13 +23,14 @@ Documentacao interativa (Swagger) gerada automaticamente em:
 
 import os
 import uuid
+import secrets
 import threading
 from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, field_validator
@@ -53,11 +54,25 @@ ORIGENS_PERMITIDAS = os.environ.get("ORIGENS_PERMITIDAS", "*").split(",")
 PASTA_RELATORIOS = Path(os.environ.get("PASTA_RELATORIOS", "./relatorios")).resolve()
 PASTA_RELATORIOS.mkdir(parents=True, exist_ok=True)
 
+# Chave que o site precisa mandar no header "X-API-Key" em toda requisicao.
+API_KEY = os.environ.get("API_KEY")
+
 if not all([CATRACA_IP, CATRACA_USUARIO, CATRACA_SENHA]):
     raise RuntimeError(
         "Configure CATRACA_IP, CATRACA_USUARIO e CATRACA_SENHA "
         "(via .env ou variaveis de ambiente) antes de subir a API."
     )
+
+if not API_KEY:
+    raise RuntimeError(
+        "Configure API_KEY no .env antes de subir a API "
+        "(gere uma chave forte, ex: com `python -c \"import secrets; print(secrets.token_urlsafe(32))\"`)."
+    )
+
+
+def verificar_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
+    if not x_api_key or not secrets.compare_digest(x_api_key, API_KEY):
+        raise HTTPException(status_code=401, detail="API Key ausente ou invalida")
 
 
 # ======================================
@@ -164,7 +179,7 @@ def _executar_job(job_id: str, data_inicio: str, data_fim: str):
             JOBS[job_id].update(status=StatusJob.ERRO, erro=f"Erro inesperado: {e}")
 
 
-@app.post("/relatorio", response_model=JobCriadoResponse)
+@app.post("/relatorio", response_model=JobCriadoResponse, dependencies=[Depends(verificar_api_key)])
 def solicitar_relatorio(periodo: PeriodoRequest):
     job_id = str(uuid.uuid4())
 
@@ -190,7 +205,7 @@ def solicitar_relatorio(periodo: PeriodoRequest):
     return JobCriadoResponse(job_id=job_id, status=StatusJob.PENDENTE)
 
 
-@app.get("/relatorio/{job_id}", response_model=JobStatusResponse)
+@app.get("/relatorio/{job_id}", response_model=JobStatusResponse, dependencies=[Depends(verificar_api_key)])
 def consultar_status(job_id: str):
     with JOBS_LOCK:
         job = JOBS.get(job_id)
@@ -213,7 +228,7 @@ def consultar_status(job_id: str):
     )
 
 
-@app.get("/relatorio/{job_id}/download")
+@app.get("/relatorio/{job_id}/download", dependencies=[Depends(verificar_api_key)])
 def baixar_relatorio(job_id: str):
     with JOBS_LOCK:
         job = JOBS.get(job_id)
