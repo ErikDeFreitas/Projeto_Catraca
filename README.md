@@ -1,233 +1,53 @@
-# API - Relatório de Acessos (Catraca ControlID)
+# Sistema Catraca
 
-API que roda na máquina local conectada à catraca (rede interna) e gera
-relatórios de acesso em CSV, para o site consumir remotamente.
+Consulta os acessos da catraca ControlID e exporta o relatório em CSV. Substitui o programa em
+Tkinter da pasta `Projeto_Catraca_V1.0`, com o Design System TCM (PySide6 + QSS).
 
-## Como o dev do site deve integrar
+## Como usar
 
-O fluxo é **assíncrono** (a extração na catraca pode demorar):
+1. Abra `dist\SistemaCatraca.exe`. O computador precisa estar na rede da catraca.
+2. Em **Relatório de acessos**, confira IP e usuário, digite a senha e escolha o período.
+3. Clique em **Gerar relatório**. O resultado aparece por colaborador; clique em um nome para ver os
+   acessos dele.
+4. Clique em **Salvar CSV**. O nome é sugerido no padrão `Relatório 2° Quinzena Outubro.csv`.
 
-```
-1) POST /relatorio            → cria o pedido, retorna um job_id
-2) GET  /relatorio/{job_id}   → consulta o status (fazer polling a cada 2-5s)
-3) GET  /relatorio/{job_id}/download → baixa o CSV quando status = "concluido"
-```
+Quem entra no relatório é escolhido na página **Usuários**: marque ou desmarque cada nome (clique na
+linha ou tecla Espaço). **Buscar na catraca** traz todos os usuários cadastrados nela (`load_objects.fcgi`);
+os novos chegam desmarcados, e o aviso final lista os nomes da lista que não existem na catraca.
+Também dá para adicionar um nome à mão (já entra marcado).
 
-**Todas as chamadas abaixo exigem o header `X-API-Key` com a chave configurada
-no `.env` do servidor.** Sem ela (ou com valor errado), a API responde `401`.
+A lista e as marcações ficam salvas no usuário do Windows (junto com IP, usuário, tema e última
+pasta). Sem marcação salva, todos os nomes entram, como na V1.0. A **senha nunca é salva**.
 
-### 1) Solicitar o relatório
+## Regras mantidas da V1.0
 
-```
-POST /relatorio
-Content-Type: application/json
-X-API-Key: <chave-combinada-com-voces>
+- Mesma consulta à catraca (`login.fcgi` e `report_generate.fcgi`) e mesmo filtro: nome igual ao da
+  lista, sem diferenciar maiúsculas nem espaços nas pontas.
+- O CSV continua igual: `Nome;Data/Hora`, separador `;`, fim de linha CRLF, UTF-8 e as linhas na ordem
+  em que a catraca devolveu.
 
-{
-  "data_inicio": "2026-07-01",
-  "data_fim": "2026-07-20",
-  "usuarios": ["Aline", "Dario", "Gabriel Correa"]
-}
-```
-
-O campo `usuarios` é **opcional** — se não for enviado, a API usa a lista
-padrão configurada no servidor (`USUARIOS_PADRAO` em `catraca_core.py`).
-Enviando essa lista, o site controla dinamicamente quem entra no filtro,
-sem precisar mexer no código a cada mudança de período/pessoas.
-
-Resposta (imediata):
-```json
-{
-  "job_id": "3f2a1b0c-...",
-  "status": "pendente"
-}
-```
-
-### 2) Consultar status
+## Desenvolvimento
 
 ```
-GET /relatorio/3f2a1b0c-...
-X-API-Key: <chave-combinada-com-voces>
+pip install -r requirements.txt pyinstaller
+python main.py                        # roda pelo código-fonte
+python -m unittest discover -s tests  # testes, com uma catraca simulada
+python build.py                       # gera dist\SistemaCatraca.exe e o .sha256
 ```
 
-Resposta enquanto processa:
-```json
-{
-  "job_id": "3f2a1b0c-...",
-  "status": "processando",
-  "criado_em": "2026-07-20T10:15:00",
-  "data_inicio": "2026-07-01",
-  "data_fim": "2026-07-20",
-  "total_registros": null,
-  "sem_registro": null,
-  "download_url": null,
-  "erro": null
-}
-```
+| Arquivo | Papel |
+|---|---|
+| `catraca_core.py` | Regras de negócio: consulta, filtro, períodos e CSV. Sem interface |
+| `main.py` | Janela e páginas de relatório e usuários |
+| `themes.py`, `styles.qss`, `components.py`, `icons.py` | Design System |
+| `updater.py`, `update_ui.py`, `version.py` | Atualização automática pelas Releases do GitHub |
+| `build.py`, `SistemaCatraca.spec` | Geração do executável |
 
-Resposta quando pronto:
-```json
-{
-  "job_id": "3f2a1b0c-...",
-  "status": "concluido",
-  "total_registros": 342,
-  "sem_registro": ["Robert"],
-  "download_url": "/relatorio/3f2a1b0c-.../download",
-  "erro": null
-}
-```
+## Publicação
 
-Possíveis valores de `status`: `pendente`, `processando`, `concluido`, `erro`.
-Se der erro, o campo `erro` vem preenchido com a mensagem.
+Enviar uma tag `vX.Y.Z` igual a `version.py` dispara `.github/workflows/release.yml`, que testa, gera o
+executável e publica a Release. Commits sem tag não geram Release.
 
-### 3) Baixar o CSV
-
-```
-GET /relatorio/3f2a1b0c-.../download
-X-API-Key: <chave-combinada-com-voces>
-```
-
-Retorna o arquivo CSV diretamente (`Content-Type: text/csv`), pronto para
-download pelo navegador.
-
-> A API Key é secreta: o `fetch` do download **não deve** ser feito direto
-> do navegador do visitante do site (isso exporia a chave). O ideal é o
-> backend do site fazer essa chamada e repassar o arquivo pro navegador,
-> ou gerar um link assinado. Se precisar de ajuda para montar esse
-> "proxy" no backend do site, é só pedir.
-
-### Exemplo em JavaScript (fetch, rodando no backend do site)
-
-```js
-const API_KEY = process.env.CATRACA_API_KEY; // nunca no frontend
-const BASE_URL = "https://relatorios.seudominio.com.br"; // dominio do Cloudflare Tunnel
-
-async function gerarRelatorio(dataInicio, dataFim, usuarios) {
-  const { job_id } = await fetch(`${BASE_URL}/relatorio`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": API_KEY,
-    },
-    body: JSON.stringify({
-      data_inicio: dataInicio,
-      data_fim: dataFim,
-      usuarios: usuarios, // opcional - array de nomes, ex: ["Aline", "Dario"]
-    }),
-  }).then(r => r.json());
-
-  // polling
-  while (true) {
-    const status = await fetch(`${BASE_URL}/relatorio/${job_id}`, {
-      headers: { "X-API-Key": API_KEY },
-    }).then(r => r.json());
-
-    if (status.status === "concluido") {
-      return fetch(`${BASE_URL}${status.download_url}`, {
-        headers: { "X-API-Key": API_KEY },
-      }); // repassar o CSV pro navegador do usuario a partir daqui
-    }
-    if (status.status === "erro") {
-      throw new Error("Erro ao gerar relatório: " + status.erro);
-    }
-    await new Promise(res => setTimeout(res, 3000)); // espera 3s e tenta de novo
-  }
-}
-```
-
-## Como subir a API (na máquina local com acesso à catraca)
-
-### Windows
-
-Foram incluídos dois arquivos prontos para dar duplo clique:
-
-1. **`instalar.bat`** — roda uma única vez. Cria o ambiente virtual, instala
-   as dependências, cria o `.env` a partir do `.env.example` e já abre o
-   Notepad para você preencher IP/usuário/senha da catraca.
-2. **`iniciar_api.bat`** — sobe a API na porta 8000. Deixe a janela aberta
-   enquanto quiser que a API fique no ar (fechar a janela derruba a API).
-
-Pré-requisito: ter o **Python 3** instalado ([python.org/downloads](https://www.python.org/downloads/)),
-marcando a opção "Add Python to PATH" durante a instalação.
-
-**Liberar a porta no Firewall do Windows** (se o site for acessar por fora
-desta máquina), rodando como Administrador no PowerShell:
-```powershell
-New-NetFirewallRule -DisplayName "API Catraca" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow
-```
-
-**Deixar rodando sem depender de janela aberta / reiniciar sozinha após
-reboot:** o jeito mais simples é usar o [NSSM](https://nssm.cc/) para
-registrar `iniciar_api.bat` como um Serviço do Windows. Isso não está
-incluído aqui pois depende de como vocês preferem administrar a máquina —
-mas é só avisar que eu monto esse passo a passo também.
-
-### Linux / macOS
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env
-# edite o .env com IP/usuario/senha da catraca e o(s) domínio(s) do site
-uvicorn app:app --host 0.0.0.0 --port 8000
-```
-
-### Em qualquer sistema
-
-Documentação interativa (Swagger) fica disponível em `/docs` automaticamente,
-ex: `http://localhost:8000/docs`.
-
-## Publicando na internet a partir do Mini PC (Docker + Cloudflare Tunnel)
-
-Como a catraca só é acessível na rede local, a API precisa rodar numa
-máquina dessa mesma rede (o Mini PC) — não dá pra jogar isso num VPS na
-nuvem sem uma VPN de volta pra rede local. A forma mais simples de publicar
-a partir do Mini PC é com **Cloudflare Tunnel**: ele expõe a API na internet
-com HTTPS, sem precisar abrir porta no roteador nem configurar Firewall.
-
-### 1) Criar o túnel na Cloudflare (uma vez só)
-
-1. Precisa de um domínio cadastrado na Cloudflare (pode ser um subdomínio
-   qualquer, tipo `relatorios.seudominio.com.br`).
-2. No painel: **Zero Trust → Networks → Tunnels → Create a tunnel**
-   (tipo Cloudflared).
-3. Dê um nome (ex: `catraca-api`) e copie o **token** gerado.
-4. Em **Public Hostname**, aponte o subdomínio escolhido para
-   `http://api:8000` (esse `api` é o nome do serviço no `docker-compose.yml`).
-
-### 2) Configurar e subir no Mini PC
-
-```bash
-# instale o Docker no Mini PC, se ainda nao tiver (docker.com/get-started)
-
-cp .env.example .env
-# preencha no .env:
-#   - CATRACA_IP / CATRACA_USUARIO / CATRACA_SENHA
-#   - API_KEY (gere uma: python -c "import secrets; print(secrets.token_urlsafe(32))")
-#   - CLOUDFLARE_TUNNEL_TOKEN (o token copiado no passo anterior)
-#   - ORIGENS_PERMITIDAS com o dominio real do site
-
-docker compose up -d --build
-```
-
-Isso sobe dois containers: a API (`api`) e o túnel (`cloudflared`), que juntos
-publicam `https://relatorios.seudominio.com.br` já com HTTPS, sem expor
-nenhuma porta do Mini PC diretamente pra internet.
-
-Pra ver os logs: `docker compose logs -f`
-Pra parar: `docker compose down`
-Pra atualizar depois de alguma mudança no código: `docker compose up -d --build`
-
-## Pontos de atenção para colocar em produção
-
-- **Autenticação por API Key já implementada** (header `X-API-Key`,
-  configurada via `.env`). Guarde essa chave com o mesmo cuidado de uma
-  senha — quem tiver ela consegue gerar relatórios pela API.
-- **CORS**: no `.env`, trocar `ORIGENS_PERMITIDAS=*` pelo domínio real do
-  site (ex: `https://www.tcmlogistica.com.br`).
-- **Exposição da máquina**: resolvida via Cloudflare Tunnel (seção acima) —
-  não precisa abrir porta no roteador nem expor IP público do Mini PC.
-- **Jobs em memória**: se a API cair/reiniciar, jobs em andamento se perdem
-  (o site precisa lidar com isso reenviando o pedido). Para um volume maior
-  de uso, vale migrar para um banco simples (SQLite) ou fila (Redis/RQ).
-- Os CSVs gerados ficam salvos em `./relatorios` (configurável no `.env`) e
-  não são apagados automaticamente — vale criar uma limpeza periódica.
+O programa procura atualização nas Releases de `ErikDeFreitas/Projeto_Catraca`; enquanto não houver
+nenhuma, a verificação apenas não encontra nada. Ela lê as Releases sem autenticação, por isso o
+repositório precisa ser público.

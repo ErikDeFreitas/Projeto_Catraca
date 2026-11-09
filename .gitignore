@@ -1,0 +1,20 @@
+# Relatórios contêm dados reais de acesso dos colaboradores
+*.csv
+
+# Credenciais
+.env
+
+# Build
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Ambiente
+.claude/
+.vscode/
+.idea/
