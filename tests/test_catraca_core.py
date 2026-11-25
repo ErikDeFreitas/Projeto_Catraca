@@ -1,7 +1,6 @@
 """Testes das regras de negócio, com uma catraca simulada em um servidor HTTP local."""
 
 import json
-import sys
 import tempfile
 import threading
 import unittest
@@ -9,9 +8,7 @@ from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import catraca_core as core
+from sistema_catraca import catraca_core as core
 
 
 class FakeCatraca(BaseHTTPRequestHandler):
@@ -55,7 +52,7 @@ class ServerTestCase(unittest.TestCase):
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
 
-    def gerar(self, colaboradores=("Aline", "Braz", "Robert")):
+    def gerar(self, colaboradores=("Ana Teste", "Bruno Teste", "Carlos Teste")):
         return core.gerar_relatorio(
             self.ip, "admin", "segredo", date(2026, 10, 1), date(2026, 10, 15), colaboradores
         )
@@ -78,20 +75,20 @@ class GerarRelatorioTests(ServerTestCase):
     def test_filtra_pela_lista_ignorando_maiusculas_e_espacos(self):
         self.handler.report_body = (
             "Nome;Data/Hora\r\n"
-            "Aline;01/10/2026 08:00:00\r\n"
+            "Ana Teste;01/10/2026 08:00:00\r\n"
             "Visitante;01/10/2026 08:10:00\r\n"
-            " ALINE ;02/10/2026 17:00:00\r\n"
-            "braz;03/10/2026 07:30:00\r\n"
+            " ANA TESTE ;02/10/2026 17:00:00\r\n"
+            "bruno teste;03/10/2026 07:30:00\r\n"
         ).encode()
         relatorio = self.gerar()
         self.assertEqual(relatorio.total_registros, 3)
-        self.assertEqual(relatorio.sem_registro, ["Robert"])
-        aline, braz, robert = relatorio.resumos
-        self.assertEqual((aline.nome, aline.total), ("Aline", 2))
-        self.assertEqual(aline.primeiro, datetime(2026, 10, 1, 8, 0))
-        self.assertEqual(aline.ultimo, datetime(2026, 10, 2, 17, 0))
-        self.assertEqual((braz.nome, braz.total), ("Braz", 1))
-        self.assertEqual((robert.total, robert.primeiro), (0, None))
+        self.assertEqual(relatorio.sem_registro, ["Carlos Teste"])
+        ana, bruno, carlos = relatorio.resumos
+        self.assertEqual((ana.nome, ana.total), ("Ana Teste", 2))
+        self.assertEqual(ana.primeiro, datetime(2026, 10, 1, 8, 0))
+        self.assertEqual(ana.ultimo, datetime(2026, 10, 2, 17, 0))
+        self.assertEqual((bruno.nome, bruno.total), ("Bruno Teste", 1))
+        self.assertEqual((carlos.total, carlos.primeiro), (0, None))
 
     def test_nome_acentuado_coincide_mesmo_sem_charset_no_cabecalho(self):
         self.handler.report_body = "Nome;Data/Hora\r\nJoão;01/10/2026 08:00:00\r\n".encode("utf-8")
@@ -99,8 +96,8 @@ class GerarRelatorioTests(ServerTestCase):
         self.assertEqual(relatorio.total_registros, 1)
 
     def test_data_inesperada_nao_perde_o_registro(self):
-        self.handler.report_body = b"Nome;Data/Hora\r\nAline;ontem\r\nAline\r\n"
-        relatorio = self.gerar(["Aline"])
+        self.handler.report_body = b"Nome;Data/Hora\r\nAna Teste;ontem\r\nAna Teste\r\n"
+        relatorio = self.gerar(["Ana Teste"])
         self.assertEqual(relatorio.total_registros, 2)
         self.assertEqual(relatorio.acessos[0].data_hora, None)
         self.assertEqual(relatorio.acessos[0].texto_original, "ontem")
@@ -108,9 +105,9 @@ class GerarRelatorioTests(ServerTestCase):
 
     def test_catraca_sem_nenhuma_linha(self):
         self.handler.report_body = b""
-        relatorio = self.gerar(["Aline"])
+        relatorio = self.gerar(["Ana Teste"])
         self.assertEqual(relatorio.total_registros, 0)
-        self.assertEqual(relatorio.sem_registro, ["Aline"])
+        self.assertEqual(relatorio.sem_registro, ["Ana Teste"])
 
     def test_login_recusado_tem_mensagem_clara(self):
         self.handler.login_status = 401
@@ -132,7 +129,7 @@ class GerarRelatorioTests(ServerTestCase):
         self.handler.report_body = b"Nome;Data/Hora\r\n"
         mensagens = []
         core.gerar_relatorio(
-            self.ip, "admin", "segredo", date(2026, 10, 1), date(2026, 10, 1), ["Aline"],
+            self.ip, "admin", "segredo", date(2026, 10, 1), date(2026, 10, 1), ["Ana Teste"],
             mensagens.append,
         )
         self.assertTrue(mensagens)
@@ -142,15 +139,15 @@ class GerarRelatorioTests(ServerTestCase):
 class ListarUsuariosTests(ServerTestCase):
     def test_busca_os_nomes_sem_repetidos_e_em_ordem(self):
         self.handler.users_body = json.dumps({"users": [
-            {"id": 1, "name": "Robert", "registration": ""},
-            {"id": 2, "name": "  aline  "},
-            {"id": 3, "name": "ALINE"},
+            {"id": 1, "name": "Carlos Teste", "registration": ""},
+            {"id": 2, "name": "  ana teste  "},
+            {"id": 3, "name": "ANA TESTE"},
             {"id": 4, "name": ""},
             {"id": 5},
             {"id": 6, "name": "João"},
         ]}).encode("utf-8")
         nomes = core.listar_usuarios(self.ip, "admin", "segredo")
-        self.assertEqual(nomes, ["aline", "João", "Robert"])
+        self.assertEqual(nomes, ["ana teste", "Carlos Teste", "João"])
         (_login, _), (path, body) = self.handler.received
         self.assertEqual(path, "/load_objects.fcgi?session=sessao-teste")
         self.assertEqual(body, {"object": "users"})
@@ -175,7 +172,7 @@ class SemRedeTests(unittest.TestCase):
         self.addCleanup(setattr, core, "criar_sessao_http", original)
         with self.assertRaisesRegex(core.CatracaError, "Confira o IP"):
             core.gerar_relatorio(
-                "127.0.0.1:9", "a", "b", date(2026, 10, 1), date(2026, 10, 1), ["Aline"]
+                "127.0.0.1:9", "a", "b", date(2026, 10, 1), date(2026, 10, 1), ["Ana Teste"]
             )
 
 
@@ -187,15 +184,15 @@ class SalvarCsvTests(unittest.TestCase):
 
     def test_formato_identico_ao_original(self):
         relatorio = core.montar_relatorio(
-            [["Aline", "01/10/2026 08:00:00"], ["Visitante", "01/10/2026 08:01:00"],
-             ["Braz", "01/10/2026 08:02:00"]],
-            ["Aline", "Braz"], date(2026, 10, 1), date(2026, 10, 1),
+            [["Ana Teste", "01/10/2026 08:00:00"], ["Visitante", "01/10/2026 08:01:00"],
+             ["Bruno Teste", "01/10/2026 08:02:00"]],
+            ["Ana Teste", "Bruno Teste"], date(2026, 10, 1), date(2026, 10, 1),
         )
         destino = self.pasta / "r.csv"
         core.salvar_csv(relatorio, destino)
         self.assertEqual(
             destino.read_bytes(),
-            b"Nome;Data/Hora\r\nAline;01/10/2026 08:00:00\r\nBraz;01/10/2026 08:02:00\r\n",
+            b"Nome;Data/Hora\r\nAna Teste;01/10/2026 08:00:00\r\nBruno Teste;01/10/2026 08:02:00\r\n",
         )
 
     def test_pasta_inexistente_tem_mensagem_clara(self):
@@ -244,23 +241,23 @@ class PeriodosTests(unittest.TestCase):
 
 class ColaboradoresTests(unittest.TestCase):
     def test_adiciona_normalizando_espacos(self):
-        self.assertEqual(core.adicionar_colaborador(["Aline"], "  Maria   Silva "), ["Aline", "Maria Silva"])
+        self.assertEqual(core.adicionar_colaborador(["Ana Teste"], "  Maria   Teste "), ["Ana Teste", "Maria Teste"])
 
     def test_recusa_vazio_e_repetido(self):
         with self.assertRaises(ValueError):
-            core.adicionar_colaborador(["Aline"], "   ")
+            core.adicionar_colaborador(["Ana Teste"], "   ")
         with self.assertRaises(ValueError):
-            core.adicionar_colaborador(["Aline"], "ALINE")
+            core.adicionar_colaborador(["Ana Teste"], "ANA TESTE")
 
     def test_mesclar_mantem_a_ordem_e_ignora_repetidos(self):
-        lista, novos = core.mesclar_usuarios(["Aline", "Braz"], ["BRAZ", " Carla  Dias ", "", "carla dias"])
-        self.assertEqual(lista, ["Aline", "Braz", "Carla Dias"])
-        self.assertEqual(novos, ["Carla Dias"])
+        lista, novos = core.mesclar_usuarios(["Ana Teste", "Bruno Teste"], ["BRUNO TESTE", " Diana  Teste ", "", "diana teste"])
+        self.assertEqual(lista, ["Ana Teste", "Bruno Teste", "Diana Teste"])
+        self.assertEqual(novos, ["Diana Teste"])
 
-    def test_lista_padrao_e_a_mais_recente_e_sem_repetidos(self):
-        self.assertEqual(len(core.COLABORADORES_PADRAO), 20)
-        self.assertIn("Nathalia Cezar", core.COLABORADORES_PADRAO)
-        self.assertEqual(len({n.casefold() for n in core.COLABORADORES_PADRAO}), 20)
+    def test_padroes_nao_trazem_dados_reais(self):
+        self.assertEqual(core.IP_PADRAO, "")
+        self.assertEqual(core.USUARIO_PADRAO, "")
+        self.assertEqual(core.COLABORADORES_PADRAO, ())
 
 
 if __name__ == "__main__":

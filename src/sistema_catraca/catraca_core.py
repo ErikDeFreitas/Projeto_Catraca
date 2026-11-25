@@ -17,31 +17,10 @@ from pathlib import Path
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-IP_PADRAO = "192.168.0.130"
-USUARIO_PADRAO = "admin"
+IP_PADRAO = ""
+USUARIO_PADRAO = ""
 
-COLABORADORES_PADRAO = (
-    "Agdo",
-    "Aline",
-    "Andreza",
-    "Dario",
-    "Edneya",
-    "Equiberto",
-    "Erivelto",
-    "Gabriel Correa",
-    "Givaldo",
-    "Marcos Oliveira",
-    "Richard",
-    "Robert",
-    "Tiago Torre",
-    "Wellington Souza",
-    "Gustavo",
-    "Joseildo",
-    "Matheus Hiroshi",
-    "Braz",
-    "Diego Oliveira",
-    "Nathalia Cezar",
-)
+COLABORADORES_PADRAO = ()
 
 CABECALHO_CSV = ["Nome", "Data/Hora"]
 FORMATO_DATA_HORA = "%d/%m/%Y %H:%M:%S"

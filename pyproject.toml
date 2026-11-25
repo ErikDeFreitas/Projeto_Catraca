@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sistema-catraca"
+dynamic = ["version"]
+description = "Relatório de acessos da catraca ControlID"
+requires-python = ">=3.11"
+dependencies = [
+    "tcm-ui>=1.5.0",
+    "requests>=2.31,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-qt"]
+
+[project.entry-points."sistema_financeiro.modulos"]
+sistema_catraca = "sistema_catraca.modulo:MODULO"
+
+[tool.setuptools.dynamic]
+version = {attr = "sistema_catraca.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

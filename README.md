@@ -1,53 +1,78 @@
 # Sistema Catraca
 
-Consulta os acessos da catraca ControlID e exporta o relatório em CSV. Substitui o programa em
-Tkinter da pasta `Projeto_Catraca_V1.0`, com o Design System TCM (PySide6 + QSS).
+Consulta os acessos da catraca ControlID e exporta o relatório em CSV. Usa o design system
+TCM (`Tcm-ui`, PySide6) e roda de duas formas: sozinho (`SistemaCatraca.exe`) ou como um dos módulos
+do Sistema Financeiro.
+
+## O que faz
+
+- **Relatório de acessos**: consulta a catraca, mostra os acessos por colaborador e salva o relatório
+  em CSV.
+- **Usuários**: define quem entra no relatório e busca na catraca os usuários cadastrados.
 
 ## Como usar
 
-1. Abra `dist\SistemaCatraca.exe`. O computador precisa estar na rede da catraca.
-2. Em **Relatório de acessos**, confira IP e usuário, digite a senha e escolha o período.
+1. Abra `SistemaCatraca.exe`. O computador precisa estar na rede da catraca.
+2. Em **Relatório de acessos**, informe o endereço (IP) da catraca e o usuário, digite a senha e
+   escolha o período.
 3. Clique em **Gerar relatório**. O resultado aparece por colaborador; clique em um nome para ver os
    acessos dele.
 4. Clique em **Salvar CSV**. O nome é sugerido no padrão `Relatório 2° Quinzena Outubro.csv`.
 
-Quem entra no relatório é escolhido na página **Usuários**: marque ou desmarque cada nome (clique na
-linha ou tecla Espaço). **Buscar na catraca** traz todos os usuários cadastrados nela (`load_objects.fcgi`);
+Na página **Usuários**, marque ou desmarque cada nome (clique na linha ou tecla Espaço) para
+escolher quem entra no relatório. **Buscar na catraca** traz todos os usuários cadastrados nela;
 os novos chegam desmarcados, e o aviso final lista os nomes da lista que não existem na catraca.
 Também dá para adicionar um nome à mão (já entra marcado).
 
-A lista e as marcações ficam salvas no usuário do Windows (junto com IP, usuário, tema e última
-pasta). Sem marcação salva, todos os nomes entram, como na V1.0. A **senha nunca é salva**.
+A **senha nunca é salva**. Endereço, usuário, lista de nomes, marcações, tema e última pasta ficam
+nas configurações do usuário do Windows (organização `TCM`, aplicação `SistemaCatraca`). O programa
+não traz nenhum endereço, usuário ou nome pré-preenchido: na primeira vez, digite o endereço e o
+usuário e busque os nomes na catraca.
 
-## Regras mantidas da V1.0
+### Vindo da versão 1.0.0
+
+Quem já alterou o endereço ou o usuário na 1.0.0 mantém esses valores, a lista de nomes e as
+marcações. Quem nunca os alterou não os tem salvos (a 1.0.0 não gravava os valores padrão) e precisa
+digitá-los uma vez na primeira abertura da 2.0.0. A preferência de tema é migrada sozinha.
+
+## Regras mantidas da 1.0.0
 
 - Mesma consulta à catraca (`login.fcgi` e `report_generate.fcgi`) e mesmo filtro: nome igual ao da
   lista, sem diferenciar maiúsculas nem espaços nas pontas.
 - O CSV continua igual: `Nome;Data/Hora`, separador `;`, fim de linha CRLF, UTF-8 e as linhas na ordem
   em que a catraca devolveu.
 
-## Desenvolvimento
+## Desenvolver
 
 ```
-pip install -r requirements.txt pyinstaller
-python main.py                        # roda pelo código-fonte
-python -m unittest discover -s tests  # testes, com uma catraca simulada
-python build.py                       # gera dist\SistemaCatraca.exe e o .sha256
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ..\Tcm-ui            # ou: pip install -r requirements.txt
+pip install -e ".[dev]" pyinstaller
+python main.py                      # roda pelo código-fonte
+python -m pytest                    # testes, com uma catraca simulada
 ```
 
-| Arquivo | Papel |
+Para não mexer nos dados reais, defina `CATRACA_DADOS` com uma pasta temporária antes de rodar.
+
+| Pasta ou arquivo | Papel |
 |---|---|
-| `catraca_core.py` | Regras de negócio: consulta, filtro, períodos e CSV. Sem interface |
-| `main.py` | Janela e páginas de relatório e usuários |
-| `themes.py`, `styles.qss`, `components.py`, `icons.py` | Design System |
-| `updater.py`, `update_ui.py`, `version.py` | Atualização automática pelas Releases do GitHub |
-| `build.py`, `SistemaCatraca.spec` | Geração do executável |
+| `src/sistema_catraca/catraca_core.py` | Regras de negócio: consulta, filtro, períodos e CSV. Sem interface |
+| `src/sistema_catraca/` (demais) | Módulo para a casca e o avulso: páginas, lista de usuários, tarefa em segundo plano |
+| `main.py` | Ponto de entrada do `.exe` avulso |
+| `build.ps1` | Gera `dist\SistemaCatraca.exe` e o `.sha256` |
 
-## Publicação
+## Lançar uma versão
 
-Enviar uma tag `vX.Y.Z` igual a `version.py` dispara `.github/workflows/release.yml`, que testa, gera o
-executável e publica a Release. Commits sem tag não geram Release.
+1. Suba `__version__` em `src/sistema_catraca/__init__.py`.
+2. Crie a tag igual à versão (ex.: `v2.0.0`) e envie para o GitHub.
 
-O programa procura atualização nas Releases de `ErikDeFreitas/Projeto_Catraca`; enquanto não houver
-nenhuma, a verificação apenas não encontra nada. Ela lê as Releases sem autenticação, por isso o
-repositório precisa ser público.
+`.github/workflows/release.yml` confere tag e versão, roda os testes, gera o executável e publica a
+Release com `SistemaCatraca.exe` e `SistemaCatraca.exe.sha256`. O programa procura atualização nas
+Releases de `ErikDeFreitas/Projeto_Catraca`, sem autenticação; por isso o repositório precisa ser
+público.
+
+## Módulo da casca
+
+O Sistema Financeiro carrega este pacote pelo ponto de entrada `sistema_financeiro.modulos`
+(`sistema_catraca.modulo:MODULO`). O acesso é liberado pelo grupo do AD `SF-Catraca`.
