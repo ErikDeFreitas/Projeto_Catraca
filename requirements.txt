@@ -1,1 +1,1 @@
-tcm-ui @ git+https://github.com/ErikDeFreitas/Tcm-ui@v1.5.0
+tcm-ui @ git+https://github.com/ErikDeFreitas/Tcm-ui@v1.6.1

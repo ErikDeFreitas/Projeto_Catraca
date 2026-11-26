@@ -13,7 +13,7 @@ def test_valores_do_modulo():
     assert (MODULO.id, MODULO.nome, MODULO.icone) == ("sistema_catraca", "Sistema Catraca", "porta")
     assert (MODULO.grupo_ad, MODULO.repositorio, MODULO.nome_exe) == (
         "SF-Catraca", "ErikDeFreitas/Projeto_Catraca", "SistemaCatraca.exe")
-    assert MODULO.versao == sistema_catraca.__version__ == "2.0.0"
+    assert MODULO.versao == sistema_catraca.__version__ == "2.0.1"
     assert MODULO.pasta_dados == dados.PASTA
     assert MODULO.aplicacao_settings == "SistemaCatraca"
     assert [(p.chave, p.titulo, p.subtitulo, p.icone) for p in MODULO.paginas] == [

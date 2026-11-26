@@ -31,9 +31,15 @@ usuário e busque os nomes na catraca.
 
 ### Vindo da versão 1.0.0
 
-Quem já alterou o endereço ou o usuário na 1.0.0 mantém esses valores, a lista de nomes e as
-marcações. Quem nunca os alterou não os tem salvos (a 1.0.0 não gravava os valores padrão) e precisa
-digitá-los uma vez na primeira abertura da 2.0.0. A preferência de tema é migrada sozinha.
+A 1.0.0 só gravava o que o usuário tinha mudado; os valores padrão vinham dentro do programa e não
+existem mais na 2.0.0. Por isso, na primeira abertura da 2.0.0:
+
+- **Endereço e usuário:** quem já os tinha alterado na 1.0.0 continua com eles; quem nunca alterou
+  precisa digitá-los uma vez.
+- **Lista de nomes e marcações:** quem já tinha editado a lista na 1.0.0 continua com ela; quem nunca
+  editou encontra a página **Usuários** vazia e precisa clicar em **Buscar na catraca** e marcar de
+  novo quem entra no relatório. Sem ninguém marcado, o relatório não é gerado e o programa avisa.
+- **Tema:** migrado sozinho.
 
 ## Regras mantidas da 1.0.0
 
